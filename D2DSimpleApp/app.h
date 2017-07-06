@@ -7,15 +7,12 @@
 /// - Declare macro for error handling
 /// - Declare macro for retrieving the module's base address
 template<class Interface>
-inline void SafeRelease(
-	Interface **ppInterfaceToRelease
-)
+inline void SafeRelease(Interface **ppInterfaceToRelease)
 {
 	if (*ppInterfaceToRelease != NULL)
 	{
 		(*ppInterfaceToRelease)->Release();
-
-		(*ppInterfaceToRelease) = NULL;
+		*ppInterfaceToRelease = NULL;
 	}
 }
 
@@ -71,9 +68,14 @@ private:
 		LPARAM lParam
 	);
 
+	void DrawGrid(INT grid_width, INT grid_height);
+	void DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float stroke_width);
+
 	HWND m_hwnd;
+
 	ID2D1Factory* m_pDirect2dFactory;
 	ID2D1HwndRenderTarget* m_pRenderTarget;
 	ID2D1SolidColorBrush* m_pLightSlateGrayBrush;
 	ID2D1SolidColorBrush* m_pCornflowerBlueBrush;
+	ID2D1SolidColorBrush* m_pBlackBrush;
 };

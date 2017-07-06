@@ -1,21 +1,19 @@
 #include "app.h"
 
-App::App() :
-	m_hwnd(NULL),
-	m_pDirect2dFactory(NULL),
-	m_pRenderTarget(NULL),
-	m_pLightSlateGrayBrush(NULL),
-	m_pCornflowerBlueBrush(NULL)
+App::App() 
+	: m_hwnd(NULL)
+	, m_pDirect2dFactory(NULL)
+	, m_pRenderTarget(NULL)
+	, m_pLightSlateGrayBrush(NULL)
+	, m_pCornflowerBlueBrush(NULL)
+	, m_pBlackBrush(NULL)
 {
 }
 
 App::~App()
 {
 	SafeRelease(&m_pDirect2dFactory);
-	SafeRelease(&m_pRenderTarget);
-	SafeRelease(&m_pLightSlateGrayBrush);
-	SafeRelease(&m_pCornflowerBlueBrush);
-
+	DiscardDeviceResources();
 }
 
 void App::RunMessageLoop()
@@ -53,7 +51,6 @@ HRESULT App::Initialize()
 
 		RegisterClassEx(&wcex);
 
-
 		// Because the CreateWindow function takes its size in pixels,
 		// obtain the system DPI and use it to scale the window size.
 		FLOAT dpiX, dpiY;
@@ -61,7 +58,6 @@ HRESULT App::Initialize()
 		// The factory returns the current system DPI. This is also the value it will use
 		// to create its own windows.
 		m_pDirect2dFactory->GetDesktopDpi(&dpiX, &dpiY);
-
 
 		// Create the window.
 		m_hwnd = CreateWindow(
@@ -120,16 +116,20 @@ HRESULT App::CreateDeviceResources()
 
 		if (SUCCEEDED(hr))
 		{
-			// Create a gray brush.
+			/// Create a gray, blue, and black brush.
 			hr = m_pRenderTarget->CreateSolidColorBrush(
 				D2D1::ColorF(D2D1::ColorF::LightSlateGray),
 				&m_pLightSlateGrayBrush
 			);
 
-			// Create a blue brush.
 			hr = m_pRenderTarget->CreateSolidColorBrush(
 				D2D1::ColorF(D2D1::ColorF::CornflowerBlue),
 				&m_pCornflowerBlueBrush
+			);
+
+			hr = m_pRenderTarget->CreateSolidColorBrush(
+				D2D1::ColorF(D2D1::ColorF::Black),
+				&m_pBlackBrush
 			);
 		}
 	}
@@ -142,6 +142,7 @@ void App::DiscardDeviceResources()
 	SafeRelease(&m_pRenderTarget);
 	SafeRelease(&m_pLightSlateGrayBrush);
 	SafeRelease(&m_pCornflowerBlueBrush);
+	SafeRelease(&m_pBlackBrush);
 }
 
 LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -221,6 +222,48 @@ LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return result;
 }
 
+void App::DrawGrid(INT grid_width, INT grid_height)
+{
+	D2D1_SIZE_F screen_sz = m_pRenderTarget->GetSize();
+
+	/// Draw a grid background
+	INT width = static_cast<INT>(screen_sz.width);
+	INT height = static_cast<INT>(screen_sz.height);
+	constexpr FLOAT stroke_width{ 0.5 };
+
+	for (INT x = 0; x < width; x += grid_width)
+	{
+		m_pRenderTarget->DrawLine(
+			D2D1::Point2F(static_cast<FLOAT>(x), 0.f)
+			, D2D1::Point2F(static_cast<FLOAT>(x), screen_sz.height)
+			, m_pLightSlateGrayBrush
+			, stroke_width
+		);
+	}
+
+	for (INT y = 0; y < height; y += grid_height)
+	{
+		m_pRenderTarget->DrawLine(
+			D2D1::Point2F(0.0f, static_cast<FLOAT>(y))
+			, D2D1::Point2F(screen_sz.width, static_cast<FLOAT>(y))
+			, m_pLightSlateGrayBrush
+			, stroke_width
+		);
+	}
+}
+
+void App::DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float stroke_width)
+{
+	D2D_POINT_2F clock_hand = D2D1::Point2F(
+		ellipse.point.x,
+		ellipse.point.y - (ellipse.radiusY * length)
+	);
+
+	m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Rotation(angle, ellipse.point));
+
+	m_pRenderTarget->DrawLine(ellipse.point, clock_hand, m_pBlackBrush, stroke_width);
+}
+
 HRESULT App::OnRender()
 {
 	HRESULT hr = S_OK;
@@ -235,64 +278,43 @@ HRESULT App::OnRender()
 
 		m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
 
-		D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
+		DrawGrid(20, 20);
 
-		/// Draw a grid background
-		int width = static_cast<int>(rtSize.width);
-		int height = static_cast<int>(rtSize.height);
-		constexpr int grid_size{ 10 };
-		constexpr float stroke_width{ 0.5 };
+		D2D1_SIZE_F screen_sz = m_pRenderTarget->GetSize();
+		const FLOAT half_w{ screen_sz.width / 2 };
+		const FLOAT half_h{ screen_sz.height / 2 };
 
-		for (int x = 0; x < width; x += grid_size)
-		{
-			m_pRenderTarget->DrawLine(
-				  D2D1::Point2F(static_cast<FLOAT>(x), 0.f)
-				, D2D1::Point2F(static_cast<FLOAT>(x), rtSize.height)
-				, m_pLightSlateGrayBrush
-				, stroke_width
-			);
-		}
-
-		for (int y = 0; y < height; y += grid_size)
-		{
-			m_pRenderTarget->DrawLine(
-				  D2D1::Point2F(0.0f, static_cast<FLOAT>(y))
-				, D2D1::Point2F(rtSize.width, static_cast<FLOAT>(y))
-				, m_pLightSlateGrayBrush
-				, stroke_width
-			);
-		}
-
-		const float box_1_sz{ 50.0 };
-		const float box_2_sz{ 100.0 };
-		const float half_w{ rtSize.width / 2 };
-		const float half_h{ rtSize.height / 2 };
-
-		D2D1_RECT_F rect_1 = D2D1::RectF(
-			  half_w - box_1_sz
-			, half_h - box_1_sz
-			, half_w + box_1_sz
-			, half_h + box_1_sz
-		);
+		const FLOAT box_sz{ 75 };
 
 		D2D1_RECT_F rect_2 = D2D1::RectF(
-			  half_w - box_2_sz
-			, half_h - box_2_sz
-			, half_w + box_2_sz
-			, half_h + box_2_sz
+			  half_w - box_sz
+			, half_h - box_sz
+			, half_w + box_sz
+			, half_h + box_sz
 		);
 
-		D2D1_RECT_F rect_3 = D2D1::RectF(
-			half_w
-			, 0
-			, half_w + half_w
-			, half_h + half_h
+		D2D1_ELLIPSE ellipse = D2D1::Ellipse(
+			  D2D1::Point2F(half_w, half_h)
+			, 50.f
+			, 50.f
 		);
 
-		m_pRenderTarget->FillRectangle(&rect_1, m_pLightSlateGrayBrush);
-		m_pRenderTarget->FillRectangle(rect_3, m_pLightSlateGrayBrush);
+		/// Draw body
+		m_pRenderTarget->FillRectangle(&rect_2, m_pLightSlateGrayBrush);
+		m_pRenderTarget->DrawRectangle(&rect_2, m_pBlackBrush);
 
-		m_pRenderTarget->DrawRectangle(&rect_2, m_pCornflowerBlueBrush);
+		/// Draw face
+		m_pRenderTarget->FillEllipse(ellipse, m_pCornflowerBlueBrush);
+		m_pRenderTarget->DrawEllipse(ellipse, m_pBlackBrush);
+
+		/// Draw hands
+		SYSTEMTIME time;
+		GetLocalTime(&time);
+		const FLOAT hour_angle = (360.f / 12) * time.wHour + (time.wMinute * 0.5f);
+		const FLOAT min_angle = (360.f / 60) * time.wMinute;
+
+		DrawClockHand(ellipse, 0.4f, hour_angle, 3.5f);
+		DrawClockHand(ellipse, 0.7f, min_angle, 3.5f);
 
 		hr = m_pRenderTarget->EndDraw();
 	}
