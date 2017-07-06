@@ -70,8 +70,8 @@ HRESULT App::Initialize()
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
-			static_cast<UINT>(ceil(640.f * dpiX / 96.f)),
-			static_cast<UINT>(ceil(480.f * dpiY / 96.f)),
+			static_cast<UINT>(ceil(600.f * dpiX / 96.f)),
+			static_cast<UINT>(ceil(600.f * dpiY / 96.f)),
 			NULL,
 			NULL,
 			HINST_THISCOMPONENT,
@@ -238,7 +238,61 @@ HRESULT App::OnRender()
 		D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
 
 		/// Draw a grid background
-		// TODO 6-7-8-9
+		int width = static_cast<int>(rtSize.width);
+		int height = static_cast<int>(rtSize.height);
+		constexpr int grid_size{ 10 };
+		constexpr float stroke_width{ 0.5 };
+
+		for (int x = 0; x < width; x += grid_size)
+		{
+			m_pRenderTarget->DrawLine(
+				  D2D1::Point2F(static_cast<FLOAT>(x), 0.f)
+				, D2D1::Point2F(static_cast<FLOAT>(x), rtSize.height)
+				, m_pLightSlateGrayBrush
+				, stroke_width
+			);
+		}
+
+		for (int y = 0; y < height; y += grid_size)
+		{
+			m_pRenderTarget->DrawLine(
+				  D2D1::Point2F(0.0f, static_cast<FLOAT>(y))
+				, D2D1::Point2F(rtSize.width, static_cast<FLOAT>(y))
+				, m_pLightSlateGrayBrush
+				, stroke_width
+			);
+		}
+
+		const float box_1_sz{ 50.0 };
+		const float box_2_sz{ 100.0 };
+		const float half_w{ rtSize.width / 2 };
+		const float half_h{ rtSize.height / 2 };
+
+		D2D1_RECT_F rect_1 = D2D1::RectF(
+			  half_w - box_1_sz
+			, half_h - box_1_sz
+			, half_w + box_1_sz
+			, half_h + box_1_sz
+		);
+
+		D2D1_RECT_F rect_2 = D2D1::RectF(
+			  half_w - box_2_sz
+			, half_h - box_2_sz
+			, half_w + box_2_sz
+			, half_h + box_2_sz
+		);
+
+		D2D1_RECT_F rect_3 = D2D1::RectF(
+			half_w
+			, 0
+			, half_w + half_w
+			, half_h + half_h
+		);
+
+		m_pRenderTarget->FillRectangle(&rect_1, m_pLightSlateGrayBrush);
+		m_pRenderTarget->FillRectangle(rect_3, m_pLightSlateGrayBrush);
+
+		m_pRenderTarget->DrawRectangle(&rect_2, m_pCornflowerBlueBrush);
 
 		hr = m_pRenderTarget->EndDraw();
 	}
