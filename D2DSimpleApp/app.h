@@ -2,7 +2,6 @@
 
 #pragma once
 
-/// Part 2:
 /// - Declare function for releasing interfaces
 /// - Declare macro for error handling
 /// - Declare macro for retrieving the module's base address
@@ -28,9 +27,10 @@ inline void SafeRelease(Interface **ppInterfaceToRelease)
 EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define HINST_THISCOMPONENT ((HINSTANCE)&__ImageBase)
 #endif
-/// Part 2
 
-/// Part 3
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
 // Declare methods for initializing the class, creating and discarding resources,
 // handling the message loop, and the windows procedure.
 class App
@@ -44,6 +44,18 @@ public:
 
 	// Process and dispatch messages
 	void RunMessageLoop();
+
+	// Draw content
+	HRESULT OnRender();
+
+	// Resize the render target
+	void OnResize(UINT width, UINT height);
+
+	ID2D1Factory* getDirect2DFactory() const { return m_pDirect2dFactory; }
+
+	void OnLButtonDown(int pixelX, int pixelY, DWORD flags);
+	void OnLButtonUp();
+	void OnMouseMove(int pixelX, int pixelY, DWORD flags);
 private:
 	// Initialize device-independent resources
 	HRESULT CreateDeviceIndependentResources();
@@ -53,20 +65,6 @@ private:
 
 	// Release device-dependent resource.
 	void DiscardDeviceResources();
-
-	// Draw content
-	HRESULT OnRender();
-
-	// Resize the render target
-	void OnResize(UINT width, UINT height);
-
-	// The windows procedure
-	static LRESULT CALLBACK WndProc(
-		HWND hWnd,
-		UINT message,
-		WPARAM wParam,
-		LPARAM lParam
-	);
 
 	void DrawGrid(INT grid_width, INT grid_height);
 	void DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float stroke_width);
@@ -78,4 +76,6 @@ private:
 	ID2D1SolidColorBrush* m_pLightSlateGrayBrush;
 	ID2D1SolidColorBrush* m_pCornflowerBlueBrush;
 	ID2D1SolidColorBrush* m_pBlackBrush;
+	D2D1_ELLIPSE m_ellipse;
+	D2D1_POINT_2F m_ptMouse;
 };

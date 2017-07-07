@@ -1,5 +1,30 @@
 #include "app.h"
 
+class DPIScale
+{
+	static float scaleX;
+	static float scaleY;
+
+public:
+	static void Initialize(ID2D1Factory *pFactory)
+	{
+		FLOAT dpiX, dpiY;
+		pFactory->GetDesktopDpi(&dpiX, &dpiY);
+		scaleX = dpiX / 96.0f;
+		scaleY = dpiY / 96.0f;
+	}
+
+	template <typename T>
+	static D2D1_POINT_2F PixelsToDips(T x, T y)
+	{
+		return D2D1::Point2F(static_cast<float>(x) / scaleX, static_cast<float>(y) / scaleY);
+	}
+};
+
+float DPIScale::scaleX = 1.0f;
+float DPIScale::scaleY = 1.0f;
+
+
 App::App() 
 	: m_hwnd(NULL)
 	, m_pDirect2dFactory(NULL)
@@ -7,6 +32,8 @@ App::App()
 	, m_pLightSlateGrayBrush(NULL)
 	, m_pCornflowerBlueBrush(NULL)
 	, m_pBlackBrush(NULL)
+	, m_ptMouse(D2D1::Point2F())
+	, m_ellipse(D2D1::Ellipse(D2D1::Point2F(50.f, 50.f), 30.f, 30.f))
 {
 }
 
@@ -37,10 +64,12 @@ HRESULT App::Initialize()
 
 	if (SUCCEEDED(hr))
 	{
+		WNDCLASS wc = {};
+
 		// Register the window class.
 		WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
 		wcex.style = CS_HREDRAW | CS_VREDRAW;
-		wcex.lpfnWndProc = App::WndProc;
+		wcex.lpfnWndProc = WindowProc;
 		wcex.cbClsExtra = 0;
 		wcex.cbWndExtra = sizeof(LONG_PTR);
 		wcex.hInstance = HINST_THISCOMPONENT;
@@ -145,36 +174,38 @@ void App::DiscardDeviceResources()
 	SafeRelease(&m_pBlackBrush);
 }
 
-LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	LRESULT result = 0;
-
-	if (message == WM_CREATE)
+	
+	if (uMsg == WM_CREATE)
 	{
 		LPCREATESTRUCT pcs = (LPCREATESTRUCT) lParam;
 		App* pApp = (App*) pcs->lpCreateParams;
-
+	
 		::SetWindowLongPtrW(
-			hWnd,
+			hwnd,
 			GWLP_USERDATA,
 			PtrToUlong(pApp)
 		);
-
+	
+		DPIScale::Initialize(pApp->getDirect2DFactory());
+	
 		result = 1;
 	}
 	else
 	{
 		App* pApp = reinterpret_cast<App*>(static_cast<LONG_PTR>(
 			::GetWindowLongPtrW(
-				hWnd,
+				hwnd,
 				GWLP_USERDATA
 			)));
-
+	
 		bool wasHandled = false;
-
+	
 		if (pApp)
 		{
-			switch (message)
+			switch (uMsg)
 			{
 			case WM_SIZE:
 			{
@@ -182,27 +213,29 @@ LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				UINT height = HIWORD(lParam);
 				pApp->OnResize(width, height);
 			}
+
 			result = 0;
 			wasHandled = true;
 			break;
-
+	
 			case WM_DISPLAYCHANGE:
 			{
-				InvalidateRect(hWnd, NULL, FALSE);
+				InvalidateRect(hwnd, NULL, FALSE);
 			}
+
 			result = 0;
 			wasHandled = true;
 			break;
-
+	
 			case WM_PAINT:
 			{
 				pApp->OnRender();
-				ValidateRect(hWnd, NULL);
+				ValidateRect(hwnd, NULL);
 			}
 			result = 0;
 			wasHandled = true;
 			break;
-
+	
 			case WM_DESTROY:
 			{
 				PostQuitMessage(0);
@@ -210,16 +243,63 @@ LRESULT App::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			result = 1;
 			wasHandled = true;
 			break;
+			
+			case WM_LBUTTONDOWN:
+			{
+				pApp->OnLButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
 			}
-		}
+			break;
 
+			case WM_LBUTTONUP:
+			{
+				pApp->OnLButtonUp();
+			}
+			break;
+
+			case WM_MOUSEMOVE:
+			{
+				pApp->OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
+			}
+			break;
+			} /// end switch
+		}
+	
 		if (!wasHandled)
 		{
-			result = DefWindowProc(hWnd, message, wParam, lParam);
+			result = DefWindowProc(hwnd, uMsg, wParam, lParam);
 		}
 	}
-
+	
 	return result;
+}
+
+void App::OnLButtonDown(int pixelX, int pixelY, DWORD flags)
+{
+	SetCapture(m_hwnd);
+	m_ellipse.point = m_ptMouse = DPIScale::PixelsToDips(pixelX, pixelY);
+	m_ellipse.radiusX = m_ellipse.radiusY = 1.0f;
+	InvalidateRect(m_hwnd, NULL, false);
+}
+
+void App::OnLButtonUp()
+{
+	ReleaseCapture();
+}
+
+void App::OnMouseMove(int pixelX, int pixelY, DWORD flags)
+{
+	D2D1_POINT_2F cursor = DPIScale::PixelsToDips(pixelX, pixelY);
+
+	const float width = (cursor.x - m_ptMouse.x) / 2;
+	const float height = (cursor.y - m_ptMouse.y) / 2;
+	const float x1 = width + m_ptMouse.x;
+	const float y1 =  height + m_ptMouse.y;
+
+	m_ellipse = D2D1::Ellipse(D2D1::Point2F(x1, y1), width, height);
+
+	/*m_ellipse.point = D2D1::Point2F(cursor.x + m_ellipse.radiusX, cursor.y + m_ellipse.radiusY);*/
+
+	InvalidateRect(m_hwnd, NULL, false);
 }
 
 void App::DrawGrid(INT grid_width, INT grid_height)
@@ -262,6 +342,8 @@ void App::DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float 
 	m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Rotation(angle, ellipse.point));
 
 	m_pRenderTarget->DrawLine(ellipse.point, clock_hand, m_pBlackBrush, stroke_width);
+
+	m_pRenderTarget->SetTransform(D2D1::IdentityMatrix());
 }
 
 HRESULT App::OnRender()
@@ -315,6 +397,9 @@ HRESULT App::OnRender()
 
 		DrawClockHand(ellipse, 0.4f, hour_angle, 3.5f);
 		DrawClockHand(ellipse, 0.7f, min_angle, 3.5f);
+
+		/// Draw movable circle
+		m_pRenderTarget->FillEllipse(m_ellipse, m_pBlackBrush);
 
 		hr = m_pRenderTarget->EndDraw();
 	}
