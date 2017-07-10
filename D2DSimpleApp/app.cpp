@@ -31,8 +31,9 @@ App::App()
 	, m_pLightSlateGrayBrush(NULL)
 	, m_pCornflowerBlueBrush(NULL)
 	, m_pBlackBrush(NULL)
+	, m_mode(CursorMode::Draw)
 	, m_ptMouse(D2D1::Point2F())
-	, m_ellipse(D2D1::Ellipse(D2D1::Point2F(50.f, 50.f), 30.f, 30.f))
+	, h_cursor(NULL)
 {
 }
 
@@ -212,7 +213,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				UINT height = HIWORD(lParam);
 				pApp->OnResize(width, height);
 			}
-
 			result = 0;
 			wasHandled = true;
 			break;
@@ -221,7 +221,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			{
 				InvalidateRect(hwnd, NULL, FALSE);
 			}
-
 			result = 0;
 			wasHandled = true;
 			break;
@@ -272,35 +271,96 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	return result;
 }
 
-void App::OnLButtonDown(int pixelX, int pixelY, DWORD flags)
+void App::OnLButtonDown(INT pixelX, INT pixelY, DWORD flags)
 {
-	SetCapture(m_hwnd);
+	D2D1_POINT_2F cursor = DPIScale::PixelsToDips(pixelX, pixelY);
 
-	// Remove comment to support ellipse squashing sample
-	//m_ellipse.point = m_ptMouse = DPIScale::PixelsToDips(pixelX, pixelY);
-	//m_ellipse.radiusX = m_ellipse.radiusY = 1.0f;
+	if (m_mode == App::CursorMode::Draw)
+	{
+		POINT pt{ pixelX, pixelY };
+
+		if (DragDetect(m_hwnd, pt))
+		{
+			m_ptMouse = cursor;
+			SetCapture(m_hwnd);
+			InsertEllipse(cursor.x, cursor.y);
+		}
+	}
+	else if (m_mode == App::CursorMode::Selection)
+	{
+		ClearSelection();
+
+		// Perform hit tests
+		for (const auto &e : m_ellipses)
+		{
+			if (e.get()->HitTest(cursor.x, cursor.y))
+			{
+				SetCapture(m_hwnd);
+
+				m_ptMouse = Selection()->ellipse.point;
+				m_ptMouse.x -= cursor.x;
+				m_ptMouse.y -= cursor.y;
+
+				m_mode = App::CursorMode::Drag;
+			}
+		}
+	}
 
 	InvalidateRect(m_hwnd, NULL, false);
 }
 
 void App::OnLButtonUp()
 {
+	if (m_mode == App::CursorMode::Draw && Selection())
+	{
+		ClearSelection();
+		InvalidateRect(m_hwnd, NULL, FALSE);
+	}
+	else if (m_mode == App::CursorMode::Drag)
+	{
+		m_mode = App::CursorMode::Selection;
+	}
+
 	ReleaseCapture();
 }
 
-void App::OnMouseMove(int pixelX, int pixelY, DWORD flags)
+void App::OnMouseMove(INT pixelX, INT pixelY, DWORD flags)
 {
 	D2D1_POINT_2F cursor = DPIScale::PixelsToDips(pixelX, pixelY);
 
-	// Remove comment to support ellipse squashing sample
-	//const float width = (cursor.x - m_ptMouse.x) / 2;
-	//const float height = (cursor.y - m_ptMouse.y) / 2;
-	//const float x1 = width + m_ptMouse.x;
-	//const float y1 =  height + m_ptMouse.y;
+	if ((flags & MK_LBUTTON) && Selection())
+	{
+		if (m_mode == App::CursorMode::Draw)
+		{
+			// Resize the ellipse
+			const float width{ (cursor.x - m_ptMouse.x) / 2 };
+			const float height{ (cursor.y - m_ptMouse.y) / 2 };
+			const float x1{ width + m_ptMouse.x };
+			const float y1{ height + m_ptMouse.y };
 
-	//m_ellipse = D2D1::Ellipse(D2D1::Point2F(x1, y1), width, height);
+			Selection()->ellipse = D2D1::Ellipse(D2D1::Point2F(x1, y1), width, height);
+		}
+		else if (m_mode == App::CursorMode::Drag)
+		{
+			Selection()->ellipse.point.x = m_ptMouse.x;
+			Selection()->ellipse.point.y = m_ptMouse.y;
+		}
+	}
 
 	InvalidateRect(m_hwnd, NULL, false);
+}
+
+std::shared_ptr<MyEllipse> App::Selection()
+{
+	return m_selection != m_ellipses.end() 
+		? *m_selection 
+		: nullptr;
+}
+
+void App::InsertEllipse(FLOAT dipX, FLOAT dipY)
+{
+	MyEllipse ellipse{ D2D1::Ellipse(D2D1::Point2F(dipX, dipY), 1.0f, 1.0f) };
+	m_selection = m_ellipses.insert(m_ellipses.end(), std::make_shared<MyEllipse>(ellipse));
 }
 
 void App::DrawGrid(INT grid_width, INT grid_height)
@@ -333,7 +393,46 @@ void App::DrawGrid(INT grid_width, INT grid_height)
 	}
 }
 
-void App::DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float stroke_width)
+void App::DrawClock()
+{
+	D2D1_SIZE_F screen_sz = m_pRenderTarget->GetSize();
+	const FLOAT half_w{ screen_sz.width / 2 };
+	const FLOAT half_h{ screen_sz.height / 2 };
+
+	const FLOAT box_sz{ 75 };
+
+	D2D1_RECT_F rect_2 = D2D1::RectF(
+		half_w - box_sz
+		, half_h - box_sz
+		, half_w + box_sz
+		, half_h + box_sz
+	);
+
+	D2D1_ELLIPSE ellipse = D2D1::Ellipse(
+		D2D1::Point2F(half_w, half_h)
+		, 50.f
+		, 50.f
+	);
+
+	/// Draw body
+	m_pRenderTarget->FillRectangle(&rect_2, m_pLightSlateGrayBrush);
+	m_pRenderTarget->DrawRectangle(&rect_2, m_pBlackBrush);
+
+	/// Draw face
+	m_pRenderTarget->FillEllipse(ellipse, m_pCornflowerBlueBrush);
+	m_pRenderTarget->DrawEllipse(ellipse, m_pBlackBrush);
+
+	/// Draw hands
+	SYSTEMTIME time;
+	GetLocalTime(&time);
+	const FLOAT hour_angle = (360.f / 12) * time.wHour + (time.wMinute * 0.5f);
+	const FLOAT min_angle = (360.f / 60) * time.wMinute;
+
+	DrawClockHand(ellipse, 0.4f, hour_angle, 3.5f);
+	DrawClockHand(ellipse, 0.7f, min_angle, 3.5f);
+}
+
+void App::DrawClockHand(D2D1_ELLIPSE& ellipse, FLOAT length, FLOAT angle, FLOAT stroke_width)
 {
 	D2D_POINT_2F clock_hand = D2D1::Point2F(
 		ellipse.point.x,
@@ -345,6 +444,31 @@ void App::DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float 
 	m_pRenderTarget->DrawLine(ellipse.point, clock_hand, m_pBlackBrush, stroke_width);
 
 	m_pRenderTarget->SetTransform(D2D1::IdentityMatrix());
+}
+
+void App::SetMode(CursorMode m)
+{
+	m_mode = m;
+
+	// Update the cursor
+	LPWSTR cursor;
+	switch (m_mode)
+	{
+	case App::CursorMode::Draw:
+		cursor = IDC_CROSS;
+		break;
+
+	case App::CursorMode::Selection:
+		cursor = IDC_HAND;
+		break;
+
+	case App::CursorMode::Drag:
+		cursor = IDC_SIZEALL;
+		break;
+	}
+
+	h_cursor = LoadCursor(NULL, cursor);
+	SetCursor(h_cursor);
 }
 
 HRESULT App::OnRender()
@@ -363,44 +487,12 @@ HRESULT App::OnRender()
 
 		DrawGrid(20, 20);
 
-		D2D1_SIZE_F screen_sz = m_pRenderTarget->GetSize();
-		const FLOAT half_w{ screen_sz.width / 2 };
-		const FLOAT half_h{ screen_sz.height / 2 };
+		DrawClock();
 
-		const FLOAT box_sz{ 75 };
-
-		D2D1_RECT_F rect_2 = D2D1::RectF(
-			  half_w - box_sz
-			, half_h - box_sz
-			, half_w + box_sz
-			, half_h + box_sz
-		);
-
-		D2D1_ELLIPSE ellipse = D2D1::Ellipse(
-			  D2D1::Point2F(half_w, half_h)
-			, 50.f
-			, 50.f
-		);
-
-		/// Draw body
-		m_pRenderTarget->FillRectangle(&rect_2, m_pLightSlateGrayBrush);
-		m_pRenderTarget->DrawRectangle(&rect_2, m_pBlackBrush);
-
-		/// Draw face
-		m_pRenderTarget->FillEllipse(ellipse, m_pCornflowerBlueBrush);
-		m_pRenderTarget->DrawEllipse(ellipse, m_pBlackBrush);
-
-		/// Draw hands
-		SYSTEMTIME time;
-		GetLocalTime(&time);
-		const FLOAT hour_angle = (360.f / 12) * time.wHour + (time.wMinute * 0.5f);
-		const FLOAT min_angle = (360.f / 60) * time.wMinute;
-
-		DrawClockHand(ellipse, 0.4f, hour_angle, 3.5f);
-		DrawClockHand(ellipse, 0.7f, min_angle, 3.5f);
-
-		/// Draw movable circle
-		m_pRenderTarget->FillEllipse(m_ellipse, m_pBlackBrush);
+		for (const auto &e : m_ellipses)
+		{
+			e.get()->Draw(m_pRenderTarget, m_pBlackBrush);
+		}
 
 		hr = m_pRenderTarget->EndDraw();
 	}

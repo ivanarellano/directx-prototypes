@@ -31,7 +31,6 @@ EXTERN_C IMAGE_DOS_HEADER __ImageBase;
 #define HINST_THISCOMPONENT ((HINSTANCE)&__ImageBase)
 #endif
 
-
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 // Declare methods for initializing the class, creating and discarding resources,
@@ -56,10 +55,12 @@ public:
 
 	ID2D1Factory* getDirect2DFactory() const { return m_pDirect2dFactory; }
 
-	void OnLButtonDown(int pixelX, int pixelY, DWORD flags);
+	void OnLButtonDown(INT pixelX, INT pixelY, DWORD flags);
 	void OnLButtonUp();
-	void OnMouseMove(int pixelX, int pixelY, DWORD flags);
+	void OnMouseMove(INT pixelX, INT pixelY, DWORD flags);
 private:
+	enum class CursorMode { Draw, Selection, Drag, None };
+
 	// Initialize device-independent resources
 	HRESULT CreateDeviceIndependentResources();
 
@@ -69,8 +70,15 @@ private:
 	// Release device-dependent resource.
 	void DiscardDeviceResources();
 
+	std::shared_ptr<MyEllipse> Selection();
+	void ClearSelection() { m_selection = m_ellipses.end(); }
+	void InsertEllipse(FLOAT dipX, FLOAT dipY);
+
 	void DrawGrid(INT grid_width, INT grid_height);
-	void DrawClockHand(D2D1_ELLIPSE& ellipse, float length, float angle, float stroke_width);
+	void DrawClock();
+	void DrawClockHand(D2D1_ELLIPSE& ellipse, FLOAT length, FLOAT angle, FLOAT stroke_width);
+
+	void SetMode(CursorMode m);
 
 	HWND m_hwnd;
 
@@ -81,8 +89,8 @@ private:
 	ID2D1SolidColorBrush* m_pBlackBrush;
 
 	std::list<std::shared_ptr<MyEllipse>> m_ellipses;
-
-	// Remove comment to support ellipse squashing sample
-	//D2D1_ELLIPSE m_ellipse;
-	//D2D1_POINT_2F m_ptMouse;
+	std::list<std::shared_ptr<MyEllipse>>::iterator m_selection;
+	CursorMode m_mode;
+	D2D1_POINT_2F m_ptMouse;
+	HCURSOR h_cursor;
 };
