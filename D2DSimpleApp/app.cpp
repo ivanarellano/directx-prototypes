@@ -213,52 +213,47 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				UINT height = HIWORD(lParam);
 				pApp->OnResize(width, height);
 			}
-			result = 0;
-			wasHandled = true;
+				result = 0;
+				wasHandled = true;
 			break;
 	
 			case WM_DISPLAYCHANGE:
-			{
 				InvalidateRect(hwnd, NULL, FALSE);
-			}
-			result = 0;
-			wasHandled = true;
+
+				result = 0;
+				wasHandled = true;
 			break;
 	
 			case WM_PAINT:
-			{
 				pApp->OnRender();
 				ValidateRect(hwnd, NULL);
-			}
-			result = 0;
-			wasHandled = true;
+
+				result = 0;
+				wasHandled = true;
 			break;
 	
 			case WM_DESTROY:
-			{
 				PostQuitMessage(0);
-			}
-			result = 1;
-			wasHandled = true;
+
+				result = 1;
+				wasHandled = true;
 			break;
 			
 			case WM_LBUTTONDOWN:
-			{
 				pApp->OnLButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
-			}
 			break;
 
 			case WM_LBUTTONUP:
-			{
 				pApp->OnLButtonUp();
-			}
 			break;
 
 			case WM_MOUSEMOVE:
-			{
 				pApp->OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), (DWORD)wParam);
-			}
 			break;
+
+			case WM_MBUTTONDOWN:
+				pApp->OnMiddleButtonDown((DWORD)wParam);
+				break;
 			} /// end switch
 		}
 	
@@ -291,10 +286,11 @@ void App::OnLButtonDown(INT pixelX, INT pixelY, DWORD flags)
 		ClearSelection();
 
 		// Perform hit tests
-		for (const auto &e : m_ellipses)
+		for (auto it = m_ellipses.begin(); it != m_ellipses.end(); ++it)
 		{
-			if (e.get()->HitTest(cursor.x, cursor.y))
+			if (it->get()->HitTest(cursor.x, cursor.y))
 			{
+				m_selection = it;
 				SetCapture(m_hwnd);
 
 				m_ptMouse = Selection()->ellipse.point;
@@ -302,6 +298,7 @@ void App::OnLButtonDown(INT pixelX, INT pixelY, DWORD flags)
 				m_ptMouse.y -= cursor.y;
 
 				m_mode = App::CursorMode::Drag;
+				break;
 			}
 		}
 	}
@@ -324,6 +321,13 @@ void App::OnLButtonUp()
 	ReleaseCapture();
 }
 
+void App::OnMiddleButtonDown(DWORD flags)
+{
+	m_mode = m_mode == App::CursorMode::Draw
+		? App::CursorMode::Selection
+		: App::CursorMode::Draw;
+}
+
 void App::OnMouseMove(INT pixelX, INT pixelY, DWORD flags)
 {
 	D2D1_POINT_2F cursor = DPIScale::PixelsToDips(pixelX, pixelY);
@@ -342,8 +346,8 @@ void App::OnMouseMove(INT pixelX, INT pixelY, DWORD flags)
 		}
 		else if (m_mode == App::CursorMode::Drag)
 		{
-			Selection()->ellipse.point.x = m_ptMouse.x;
-			Selection()->ellipse.point.y = m_ptMouse.y;
+			Selection()->ellipse.point.x = cursor.x + m_ptMouse.x;
+			Selection()->ellipse.point.y = cursor.y + m_ptMouse.y;
 		}
 	}
 

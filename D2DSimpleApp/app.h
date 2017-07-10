@@ -1,5 +1,6 @@
 #include "headers.h"
 #include "MyEllipse.h"
+#include <iostream>
 #include <list>
 #include <memory>
 
@@ -57,6 +58,7 @@ public:
 
 	void OnLButtonDown(INT pixelX, INT pixelY, DWORD flags);
 	void OnLButtonUp();
+	void OnMiddleButtonDown(DWORD flags);
 	void OnMouseMove(INT pixelX, INT pixelY, DWORD flags);
 private:
 	enum class CursorMode { Draw, Selection, Drag, None };
