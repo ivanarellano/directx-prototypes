@@ -21,12 +21,18 @@
     <ClCompile Include="app.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MyEllipse.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="headers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="app.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MyEllipse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,4 +1,7 @@
 #include "headers.h"
+#include "MyEllipse.h"
+#include <list>
+#include <memory>
 
 #pragma once
 
@@ -76,6 +79,10 @@ private:
 	ID2D1SolidColorBrush* m_pLightSlateGrayBrush;
 	ID2D1SolidColorBrush* m_pCornflowerBlueBrush;
 	ID2D1SolidColorBrush* m_pBlackBrush;
-	D2D1_ELLIPSE m_ellipse;
-	D2D1_POINT_2F m_ptMouse;
+
+	std::list<std::shared_ptr<MyEllipse>> m_ellipses;
+
+	// Remove comment to support ellipse squashing sample
+	//D2D1_ELLIPSE m_ellipse;
+	//D2D1_POINT_2F m_ptMouse;
 };

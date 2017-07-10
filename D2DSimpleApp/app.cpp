@@ -24,7 +24,6 @@ public:
 float DPIScale::scaleX = 1.0f;
 float DPIScale::scaleY = 1.0f;
 
-
 App::App() 
 	: m_hwnd(NULL)
 	, m_pDirect2dFactory(NULL)
@@ -276,8 +275,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 void App::OnLButtonDown(int pixelX, int pixelY, DWORD flags)
 {
 	SetCapture(m_hwnd);
-	m_ellipse.point = m_ptMouse = DPIScale::PixelsToDips(pixelX, pixelY);
-	m_ellipse.radiusX = m_ellipse.radiusY = 1.0f;
+
+	// Remove comment to support ellipse squashing sample
+	//m_ellipse.point = m_ptMouse = DPIScale::PixelsToDips(pixelX, pixelY);
+	//m_ellipse.radiusX = m_ellipse.radiusY = 1.0f;
+
 	InvalidateRect(m_hwnd, NULL, false);
 }
 
@@ -290,14 +292,13 @@ void App::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 {
 	D2D1_POINT_2F cursor = DPIScale::PixelsToDips(pixelX, pixelY);
 
-	const float width = (cursor.x - m_ptMouse.x) / 2;
-	const float height = (cursor.y - m_ptMouse.y) / 2;
-	const float x1 = width + m_ptMouse.x;
-	const float y1 =  height + m_ptMouse.y;
+	// Remove comment to support ellipse squashing sample
+	//const float width = (cursor.x - m_ptMouse.x) / 2;
+	//const float height = (cursor.y - m_ptMouse.y) / 2;
+	//const float x1 = width + m_ptMouse.x;
+	//const float y1 =  height + m_ptMouse.y;
 
-	m_ellipse = D2D1::Ellipse(D2D1::Point2F(x1, y1), width, height);
-
-	/*m_ellipse.point = D2D1::Point2F(cursor.x + m_ellipse.radiusX, cursor.y + m_ellipse.radiusY);*/
+	//m_ellipse = D2D1::Ellipse(D2D1::Point2F(x1, y1), width, height);
 
 	InvalidateRect(m_hwnd, NULL, false);
 }
