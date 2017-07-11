@@ -29,7 +29,7 @@ public:
     void OnWindowSizeChanged(int width, int height);
 
     // Properties
-    void GetDefaultSize( int& width, int& height ) const;
+    void GetDefaultSize(int& width, int& height) const;
 
 private:
 
@@ -62,4 +62,6 @@ private:
 
     // Rendering loop timer.
     DX::StepTimer                                   m_timer;
+
+	std::unique_ptr<DirectX::GamePad>				m_gamePad;
 };
